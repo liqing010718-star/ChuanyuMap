@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>川渝城市群家乡连线地图 - 专业控制版</title>
+    <style>
+        /* 保持原有样式，仅微调背景以匹配 ECharts 背景 */
+        body { margin: 0; padding: 0; overflow: hidden; background: #0b1120; }
+        #chart-container { width: 100vw; height: 100vh; }
+
+        /* 1. 右上角二维码悬浮窗 */
+        #qrcode-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(16, 27, 59, 0.9);
+            border: 1px solid #1785BF;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(23, 133, 191, 0.4);
+            z-index: 999;
+            text-align: center;
+        }
+        #qrcode-container p {
+            color: #4DEFFF;
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        #qrcode img {
+            padding: 5px;
+            background: white;
+            border-radius: 4px;
+        }
+
+        /* 2. 左上角操作控制面板 (新增) */
+        #controls-container {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(16, 27, 59, 0.95);
+            border: 1px solid #1785BF;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(23, 133, 191, 0.4);
+            z-index: 999;
+            width: 260px;
+        }
+        #controls-container h3 {
+            color: #fff;
+            margin: 0 0 15px 0;
+            font-size: 16px;
+            font-family: "Microsoft YaHei", sans-serif;
+            border-bottom: 1px solid #1E88E5;
+            padding-bottom: 10px;
+        }
+
+        /* 下拉框样式 */
+        .control-group { margin-bottom: 15px; }
+        select {
+            width: 100%;
+            padding: 10px;
+            background: #0b1120;
+            color: #4DEFFF;
+            border: 1px solid #1785BF;
+            border-radius: 4px;
+            font-size: 14px;
+            outline: none;
+        }
+
+        /* 按钮样式 */
+        .btn-row { display: flex; gap: 10px; }
+        button {
+            flex: 1;
+            padding: 10px 0;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            color: white;
+            transition: all 0.3s;
+        }
+        .btn-add {
+            background: linear-gradient(90deg, #1890ff, #096dd9);
+            box-shadow: 0 2px 10px rgba(24, 144, 255, 0.3);
+        }
+        .btn-add:hover { background: #40a9ff; }
+
+        .btn-clear {
+            background: linear-gradient(90deg, #ff4d4f, #cf1322);
+            box-shadow: 0 2px 10px hwb(359 22% 56% / 0.3);
+        }
+        .btn-clear:hover { background: #ff7875; }
+
+        /* 加载提示 */
+        #loading {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: #4DEFFF;
+            font-size: 20px;
+            font-family: sans-serif;
+            z-index: 1000;
+        }
+    </style>
+
+    <script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+
+    <div id="loading">正在加载川渝地图数据...</div>
+
+    <div id="chart-container"></div>
+
+    <div id="controls-container">
+        <h3>手动控制台</h3>
+        <div class="control-group">
+            <select id="pcCitySelect">
+                <option value="">-- 选择目标城市/区县 --</option>
+            </select>
+        </div>
+        <div class="btn-row">
+            <button class="btn-add" onclick="manualAddLine()">生成连线</button>
+            <button class="btn-clear" onclick="clearAllLines()">清除连线</button>
+        </div>
+    </div>
+
+    <div id="qrcode-container">
+        <p>手机扫码互动</p>
+        <div id="qrcode"></div>
+    </div>
+
+    <script>
+        // ---------------------- 1. 基础配置 (完整城市列表) ----------------------
+        const cityCoords = {
+            // -------------------- 重庆市 (38个区县) --------------------
+            "重庆市": [106.550464, 29.563009],
+            "渝中区": [106.587254, 29.554681],
+            "大渡口区": [106.498954, 29.532517],
+            "江北区": [106.568652, 29.582741],
+            "沙坪坝区": [106.442734, 29.579036],
+            "九龙坡区": [106.468845, 29.513925],
+            "南岸区": [106.597446, 29.504003], // 起点
+            "北碚区": [106.334113, 29.813385],
+            "渝北区": [106.648904, 29.626314],
+            "巴南区": [106.517436, 29.417875],
+            "万州区": [108.353036, 30.835791],
+            "涪陵区": [107.388987, 29.705898],
+            "黔江区": [108.875878, 29.516586],
+            "长寿区": [106.977171, 29.866618],
+            "江津区": [106.25, 29.28],
+            "合川区": [106.26, 30.04],
+            "永川区": [105.90, 29.35],
+            "南川区": [107.09, 29.17],
+            "綦江区": [106.67, 29.17],
+            "大足区": [105.71, 29.82],
+            "璧山区": [106.27, 29.59],
+            "铜梁区": [106.06, 30.08],
+            "潼南区": [105.85, 30.22],
+            "荣昌区": [105.59, 29.40],
+            "开州区": [108.3800, 31.1890],
+            "梁平区": [107.82, 30.63],
+            "武隆区": [107.76, 29.35],
+            "城口县": [108.72, 31.95],
+            "丰都县": [107.73, 29.87],
+            "垫江县": [107.34, 30.31],
+            "忠县": [108.03, 30.28],
+            "云阳县": [108.70, 30.91],
+            "奉节县": [109.47, 31.02],
+            "巫山县": [109.87, 31.07],
+            "巫溪县": [109.64, 31.43],
+            "石柱土家族自治县": [108.06, 30.04],
+            "秀山土家族苗族自治县": [108.99, 28.47],
+            "酉阳土家族苗族自治县": [108.76, 28.84],
+            "彭水苗族土家族自治县": [108.16, 29.28],
+
+            // -------------------- 四川省 (21个市州) --------------------
+            "成都市": [104.065735, 30.659462],
+            "绵阳市": [104.755164, 31.474372],
+            "德阳市": [104.386120, 31.131889],
+            "宜宾市": [104.635578, 28.760958],
+            "泸州市": [105.386194, 28.881175],
+            "乐山市": [103.760285, 29.594672],
+            "南充市": [106.082530, 30.836056],
+            "达州市": [107.501748, 31.202922],
+            "自贡市": [104.773416, 29.344625],
+            "攀枝花市": [101.717737, 26.582510],
+            "广元市": [105.836910, 32.447577],
+            "遂宁市": [105.589199, 30.504735],
+            "内江市": [105.059389, 29.594176],
+            "眉山市": [103.863916, 30.049309],
+            "广安市": [106.633259, 30.482867],
+            "雅安市": [103.005206, 30.082139],
+            "资阳市": [104.668610, 30.124518],
+            "巴中市": [106.759111, 31.860926],
+            "凉山彝族自治州": [102.269390, 27.921766],
+            "阿坝藏族羌族自治州": [103.0905, 31.9009],
+            "甘孜藏族自治州": [101.9566, 30.0410]
+        };
+
+        const START_POINT = cityCoords["南岸区"];
+        const START_NAME = "南岸区";
+
+        // ***** 修改点 1: 城市下拉框按中文拼音排序 *****
+        const selectEl = document.getElementById("pcCitySelect");
+        const cityNames = Object.keys(cityCoords);
+        
+        // 使用 localeCompare 进行中文（拼音）排序
+        cityNames.sort((a, b) => a.localeCompare(b, 'zh-CN'));
+
+        cityNames.forEach(city => {
+            const option = document.createElement("option");
+            option.value = city;
+            option.text = city;
+            selectEl.appendChild(option);
+        });
+
+        // ---------------------- 2. Firebase 初始化 ----------------------
+        const firebaseConfig = {
+            apiKey: "AIzaSyC8ShQbPovscKxEH-uN7HkCBbKAN514u5Q",
+            authDomain: "maptest-7cc7d.firebaseapp.com",
+            databaseURL: "https://maptest-7cc7d-default-rtdb.firebaseio.com",
+            projectId: "maptest-7cc7d",
+            storageBucket: "maptest-7cc7d.firebasestorage.app",
+            messagingSenderId: "420772513972",
+            appId: "1:420772513972:web:76fb5ce8e19b82be66afe1"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // ---------------------- 3. ECharts 初始化 ----------------------
+        const chart = echarts.init(document.getElementById('chart-container'));
+
+        // 纹理 (Base64)
+        const textureImg = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAL0lEQVQIW2NkQAJ/Gf5vBAmwMYAAmAATEBPG///+/zcD8xn+//8PUgRTAzYAzCwA+2sXc9/j52QAAAAASUVORK5CYII=';
+
+        let lineData = []; // 当前连线数据缓存
+
+        // 获取所有城市中心点（用于背景白点）
+        const allCityPoints = Object.keys(cityCoords).map(name => ({
+            name: name,
+            // scatter图使用 name 属性来获取标签文本 {b}
+            value: [...cityCoords[name]] 
+        }));
+
+        // 准备起始点数据 (用于永久白色高亮)
+        const startPointData = [{
+            name: START_NAME,
+            // effectScatter 数据格式 value: [longitude, latitude, value]
+            value: [...START_POINT, 1] 
+        }];
+
+
+        // 加载并合并地图
+        Promise.all([
+            fetch('https://geo.datav.aliyun.com/areas_v3/bound/510000_full.json').then(r => r.json()), // 四川
+            fetch('https://geo.datav.aliyun.com/areas_v3/bound/500000_full.json').then(r => r.json())  // 重庆
+        ]).then(([sichuanJson, chongqingJson]) => {
+
+            // 合并 GeoJSON features
+            const combinedFeatures = [...sichuanJson.features, ...chongqingJson.features];
+            const combinedJson = { type: "FeatureCollection", features: combinedFeatures };
+            echarts.registerMap('chuanyu', combinedJson);
+            document.getElementById('loading').style.display = 'none';
+
+            const option = {
+                backgroundColor: '#0b1120',
+                tooltip: { show: false },
+
+                geo: {
+                    map: 'chuanyu',
+                    roam: true,
+                    label: { show: false }, 
+                    itemStyle: {
+                        areaColor: { image: getTextureImage(), repeat: 'repeat' },
+                        borderColor: '#1E88E5',
+                        borderWidth: 1,
+                        shadowColor: 'rgba(0, 0, 0, 0.5)',
+                        shadowBlur: 10,
+                        shadowOffsetY: 5
+                    },
+                    emphasis: {
+                        areaColor: '#1785BF',
+                        label: { show: false }
+                    }
+                },
+
+                series: [
+                    // 0. 地图层：关闭标签
+                    {
+                        type: 'map',
+                        map: 'chuanyu',
+                        geoIndex: 0,
+                        aspectScale: 0.75,
+                        label: { show: false },
+                        itemStyle: {
+                            areaColor: { type: 'pattern', image: getTextureImage(), repeat: 'repeat' },
+                            borderColor: '#4DEFFF',
+                            borderWidth: 0.5,
+                            opacity: 0.8
+                        },
+                        select: { disabled: true }
+                    },
+
+                    // 1. 静态中心点 (所有城市白点)
+                    {
+                        type: 'scatter',
+                        coordinateSystem: 'geo',
+                        zlevel: 5, 
+                        symbol: 'circle',
+                        symbolSize: 3,
+                        itemStyle: { color: 'rgba(255, 255, 255, 0.5)' },
+                        label: { show: false },
+                        emphasis: { label: { show: false }, itemStyle: { color: 'rgba(255, 255, 255, 0.8)' } },
+                        data: allCityPoints
+                    },
+
+                    // 2. 动态连线 (飞线)
+                    {
+                        type: 'lines',
+                        zlevel: 3,
+                        effect: {
+                            show: true,
+                            period: 4,
+                            trailLength: 0.5,
+                            symbol: 'arrow',
+                            symbolSize: 6
+                        },
+                        lineStyle: {
+                            normal: {
+                                color: '#4DEFFF',
+                                width: 1.5,
+                                opacity: 0.7,
+                                curveness: 0.2
+                            }
+                        },
+                        data: [] // 动态数据
+                    },
+
+                    // 3. 粒子特效 (金色光点)
+                    {
+                        type: 'lines',
+                        zlevel: 4,
+                        effect: {
+                            show: true,
+                            period: 4,
+                            trailLength: 0.1,
+                            symbol: 'circle',
+                            symbolSize: 3
+                        },
+                        lineStyle: {
+                            normal: { color: '#FFD700', width: 0, curveness: 0.2 }
+                        },
+                        data: []
+                    },
+
+                    // 4. 目标高亮涟漪 (动态连接的城市)
+                    {
+                        type: 'effectScatter',
+                        coordinateSystem: 'geo',
+                        zlevel: 6,
+                        rippleEffect: { brushType: 'stroke', scale: 3 },
+                        label: { 
+                            show: true,
+                            formatter: '{b}',
+                            position: 'right',
+                            color: '#FFD700',
+                            fontSize: 14,
+                            fontWeight: 'bold',
+                            textBorderColor: '#0b1120',
+                            textBorderWidth: 4,
+                            textShadowColor: 'rgba(0, 0, 0, 0.5)',
+                            textShadowBlur: 5
+                        },
+                        itemStyle: { color: '#4DEFFF', shadowBlur: 10, shadowColor: '#fff' },
+                        data: [] // 动态数据
+                    },
+                    
+                    // ***** 修改点 2: 新增起始点南岸区永久高亮显示 (白色标记) *****
+                    {
+                        type: 'effectScatter',
+                        coordinateSystem: 'geo',
+                        zlevel: 7, // 确保在最顶层
+                        rippleEffect: { 
+                            brushType: 'stroke', 
+                            scale: 4, // 稍微大一些
+                            color: 'white' // 白色涟漪效果
+                        },
+                        
+                        label: { 
+                            show: true, // 始终显示标签 (已满足)
+                            formatter: '{b}', // 显示 data.name
+                            position: 'right', 
+                            color: 'white', // 标签颜色设为白色 (已满足)
+                            fontSize: 16,
+                            fontWeight: 'bold',
+                            textBorderColor: '#0b1120', 
+                            textBorderWidth: 4, 
+                            textShadowColor: '#4DEFFF', // 协调颜色：改为亮蓝色阴影
+                            textShadowBlur: 5
+                        },
+                        
+                        itemStyle: { 
+                            color: 'white', // 点的颜色设为白色 (已满足)
+                            shadowBlur: 15, // 更明显的阴影
+                            shadowColor: 'white' 
+                        },
+                        data: startPointData // 静态数据
+                    }
+                ]
+            };
+
+            chart.setOption(option);
+            startListening(); // 开始监听数据
+
+        }).catch(err => {
+            console.error(err);
+            document.getElementById('loading').innerText = "地图数据加载失败";
+        });
+
+        function getTextureImage() {
+            const img = new Image();
+            img.src = textureImg;
+            return img;
+        }
+
+        // ---------------------- 4. 逻辑控制与Firebase交互 ----------------------
+
+        // A. 监听 Firebase 数据新增 (包括手机提交和电脑提交)
+        function startListening() {
+            // 先加载所有历史数据，再监听新数据
+            db.ref("hometownSubmissions").once("value").then(snapshot => {
+                snapshot.forEach(childSnapshot => {
+                    const data = childSnapshot.val();
+                    drawOneLine(data.city);
+                });
+            });
+
+            // 监听后续新增
+            db.ref("hometownSubmissions").on("child_added", function(snapshot) {
+                const data = snapshot.val();
+                
+                // 简单判断是否已经存在，避免重复绘制
+                const isDuplicated = lineData.some(item => item.toName === data.city);
+                if (!isDuplicated) {
+                    drawOneLine(data.city);
+                }
+            });
+        }
+
+        // B. 绘制一条线的通用逻辑
+        function drawOneLine(cityName) {
+            const targetCoords = cityCoords[cityName];
+            if (!targetCoords) return;
+
+            // **重要: 检查是否已存在该连线**
+            const isExist = lineData.some(item => item.toName === cityName);
+            if (isExist) return;
+
+            const newLine = {
+                fromName: START_NAME,
+                toName: cityName,
+                coords: [START_POINT, targetCoords]
+            };
+
+            lineData.push(newLine);
+
+            // 提取所有目标点用于涟漪效果 (现在也负责显示标签)
+            const activePoints = lineData.map(item => ({
+                name: item.toName,
+                // ECharts effectScatter 数据格式 value: [longitude, latitude, value]
+                value: [...item.coords[1], 1] 
+            }));
+
+            // 增量更新图表 (更新 series 2, 3, 4)
+            chart.setOption({
+                series: [
+                    {}, // 0: map ignored
+                    {}, // 1: scatter ignored
+                    { data: lineData }, // 2: blue lines
+                    { data: lineData }, // 3: gold particles
+                    { data: activePoints } // 4: ripple points (now with labels)
+                    // 5: start point ignored as it is static data
+                ]
+            });
+        }
+
+        // C. [电脑端功能] 手动添加连线
+        function manualAddLine() {
+            const city = document.getElementById("pcCitySelect").value;
+            if (!city) {
+                alert("请先选择一个城市或区县！");
+                return;
+            }
+
+            // 写入 Firebase -> 触发 child_added -> 自动调用 drawOneLine
+            db.ref("hometownSubmissions").push({
+                city: city,
+                source: "PC_Manual",
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            }).then(() => {
+                console.log("PC端手动添加成功");
+            }).catch(err => {
+                alert("添加失败，请检查网络");
+            });
+        }
+
+        // D. [电脑端功能] 清除所有连线
+        function clearAllLines() {
+            if (!confirm("确定要清除屏幕上所有连线吗？这将同时清空云端历史数据。")) return;
+
+            // 1. 清空 Firebase 数据
+            db.ref("hometownSubmissions").remove()
+                .then(() => {
+                    // 2. 清空本地数据并重绘
+                    lineData = [];
+                    chart.setOption({
+                        series: [
+                            {}, {},
+                            { data: [] }, // 2
+                            { data: [] }, // 3
+                            { data: [] }, // 4
+                            {} // 5
+                        ]
+                    });
+                    alert("所有连线已清除，页面已重置。");
+                })
+                .catch(err => {
+                    alert("清除失败: " + err.message);
+                });
+        }
+
+        // ---------------------- 5. 其他 ----------------------
+        // 替换成你的手机端URL
+        const phonePageUrl = "https://liqing010718-star.github.io/ChuanyuProject";
+        new QRCode(document.getElementById("qrcode"), {
+            text: phonePageUrl,
+            width: 120,
+            height: 120,
+            colorDark : "#000000",
+            colorLight : "#ffffff"
+        });
+
+        window.addEventListener('resize', () => chart.resize());
+    </script>
+</body>
+</html>

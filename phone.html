@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>选择你的家乡</title>
+  <style>
+    body { 
+      font-family: "微软雅黑", sans-serif; 
+      padding: 20px; 
+      max-width: 400px; 
+      margin: 0 auto; 
+      background-color: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 2px 15px rgba(0,0,0,0.05);
+    }
+    h1 { 
+      text-align: center; 
+      color: #333; 
+      font-size: 24px; 
+      margin: 0 0 30px 0;
+    }
+    .form-group { margin-bottom: 25px; }
+    select { 
+      width: 100%; 
+      padding: 14px; 
+      border: 1px solid #ddd; 
+      border-radius: 8px; 
+      font-size: 16px; 
+      background-color: white;
+      appearance: none;
+      background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      background-size: 16px;
+    }
+    button { 
+      width: 100%; 
+      padding: 14px; 
+      background-color: #1890ff; 
+      color: white; 
+      border: none; 
+      border-radius: 8px; 
+      font-size: 16px; 
+      cursor: pointer; 
+      transition: background-color 0.3s;
+    }
+    button:hover { background-color: #096dd9; }
+    button:disabled {
+      background-color: #87ceeb;
+      cursor: not-allowed;
+    }
+  </style>
+  <!-- 关键修复：手机端也用 Firebase 兼容版，和电脑端一致 -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>你的家乡是哪里？</h1>
+    <div class="form-group">
+      <select id="citySelect" required>
+        <option value="">请选择你的家乡城市</option>
+        <!-- 城市选项将通过JS动态生成 -->
+      </select>
+    </div>
+    <button onclick="submitHometown()">提交</button>
+  </div>
+
+  <script>
+    // -------------------------- 1. 初始化 Firebase（兼容版，与电脑端完全一致） --------------------------
+    const firebaseConfig = {
+      apiKey: "AIzaSyC8ShQbPovscKxEH-uN7HkCBbKAN514u5Q",
+      authDomain: "maptest-7cc7d.firebaseapp.com",
+      databaseURL: "https://maptest-7cc7d-default-rtdb.firebaseio.com",
+      projectId: "maptest-7cc7d",
+      storageBucket: "maptest-7cc7d.firebasestorage.app",
+      messagingSenderId: "420772513972",
+      appId: "1:420772513972:web:76fb5ce8e19b82be66afe1"
+    };
+    // 兼容版初始化方式
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // -------------------------- 2. 动态生成城市下拉选项（与电脑端一致） --------------------------
+    const chuanYuCities = [
+      { name: "重庆市" }, { name: "万州区" }, { name: "黔江区" }, { name: "涪陵区" }, { name: "渝中区" },
+      { name: "大渡口区" }, { name: "江北区" }, { name: "沙坪坝区" }, { name: "九龙坡区" }, { name: "南岸区" },
+      { name: "北碚区" }, { name: "渝北区" }, { name: "巴南区" }, { name: "长寿区" }, { name: "成都市" },
+      { name: "绵阳市" }, { name: "德阳市" }, { name: "宜宾市" }, { name: "泸州市" }, { name: "乐山市" },
+      { name: "南充市" }, { name: "达州市" }, { name: "自贡市" }, { name: "攀枝花市" }, { name: "广元市" },
+      { name: "遂宁市" }, { name: "内江市" }, { name: "眉山市" }, { name: "广安市" }, { name: "雅安市" },
+      { name: "资阳市" }, { name: "巴中市" }, { name: "凉山彝族自治州" }
+    ];
+
+    const citySelect = document.getElementById("citySelect");
+    chuanYuCities.forEach(city => {
+      const option = document.createElement("option");
+      option.value = city.name;
+      option.textContent = city.name;
+      citySelect.appendChild(option);
+    });
+
+    // -------------------------- 3. 提交家乡信息到Firebase --------------------------
+    function submitHometown() {
+      const selectedCity = citySelect.value.trim();
+      if (!selectedCity) {
+        alert("请选择你的家乡城市！");
+        return;
+      }
+
+      // 禁用按钮防止重复提交
+      const submitBtn = document.querySelector("button");
+      submitBtn.disabled = true;
+      submitBtn.textContent = "提交中...";
+
+      // 向Firebase数据库添加提交记录
+      db.ref("hometownSubmissions").push({
+        city: selectedCity,
+        submitTime: new Date().toLocaleString()
+      }, function(error) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "提交";
+        
+        if (error) {
+          alert("提交失败，请检查网络后重试！");
+          console.error("提交失败：", error);
+        } else {
+          alert("提交成功！电脑端地图已更新连线～");
+          citySelect.value = "";
+        }
+      });
+    }
+  </script>
+</body>
+</html>
