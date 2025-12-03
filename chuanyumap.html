@@ -134,7 +134,7 @@
     </div>
 
     <script>
-        // ---------------------- 1. 基础配置 (完整城市列表) ----------------------
+        // ---------------------- 1. 基础配置 (城市列表) ----------------------
         const cityCoords = {
             // -------------------- 重庆市 (38个区县) --------------------
             "重庆市": [106.550464, 29.563009],
@@ -143,7 +143,7 @@
             "江北区": [106.568652, 29.582741],
             "沙坪坝区": [106.442734, 29.579036],
             "九龙坡区": [106.468845, 29.513925],
-            "南岸区": [106.597446, 29.504003], // 起点
+            "南岸区": [106.597446, 29.504003], // 目的地
             "北碚区": [106.334113, 29.813385],
             "渝北区": [106.648904, 29.626314],
             "巴南区": [106.517436, 29.417875],
@@ -201,14 +201,14 @@
             "甘孜藏族自治州": [101.9566, 30.0410]
         };
 
-        const START_POINT = cityCoords["南岸区"];
-        const START_NAME = "南岸区";
+        // ***** 修改点: 南岸区现在是终点 (Destination) *****
+        const DESTINATION_POINT = cityCoords["南岸区"];
+        const DESTINATION_NAME = "南岸区";
 
-        // ***** 修改点 1: 城市下拉框按中文拼音排序 *****
+        // 城市下拉框按中文拼音排序
         const selectEl = document.getElementById("pcCitySelect");
         const cityNames = Object.keys(cityCoords);
         
-        // 使用 localeCompare 进行中文（拼音）排序
         cityNames.sort((a, b) => a.localeCompare(b, 'zh-CN'));
 
         cityNames.forEach(city => {
@@ -242,22 +242,21 @@
         // 获取所有城市中心点（用于背景白点）
         const allCityPoints = Object.keys(cityCoords).map(name => ({
             name: name,
-            // scatter图使用 name 属性来获取标签文本 {b}
             value: [...cityCoords[name]] 
         }));
 
-        // 准备起始点数据 (用于永久白色高亮)
-        const startPointData = [{
-            name: START_NAME,
+        // ***** 修改点: 准备目的地南岸区永久高亮数据 *****
+        const destinationPointData = [{
+            name: DESTINATION_NAME,
             // effectScatter 数据格式 value: [longitude, latitude, value]
-            value: [...START_POINT, 1] 
+            value: [...DESTINATION_POINT, 1] 
         }];
 
 
         // 加载并合并地图
         Promise.all([
             fetch('./sichuan.json').then(r => r.json()), // 四川
-            fetch('./chongqing.json').then(r => r.json())  // 重庆
+            fetch('./chongqing.json').then(r => r.json()) // 重庆
         ]).then(([sichuanJson, chongqingJson]) => {
 
             // 合并 GeoJSON features
@@ -357,7 +356,7 @@
                         data: []
                     },
 
-                    // 4. 目标高亮涟漪 (动态连接的城市)
+                    // 4. 起点高亮涟漪 (动态连接的城市) - 现在是起始点
                     {
                         type: 'effectScatter',
                         coordinateSystem: 'geo',
@@ -379,22 +378,22 @@
                         data: [] // 动态数据
                     },
                     
-                    // ***** 修改点 2: 新增起始点南岸区永久高亮显示 (白色标记) *****
+                    // 5. 目的地南岸区永久高亮显示 (白色标记)
                     {
                         type: 'effectScatter',
                         coordinateSystem: 'geo',
                         zlevel: 7, // 确保在最顶层
                         rippleEffect: { 
                             brushType: 'stroke', 
-                            scale: 4, // 稍微大一些
+                            scale: 4, 
                             color: 'white' // 白色涟漪效果
                         },
                         
                         label: { 
-                            show: true, // 始终显示标签 (已满足)
+                            show: true, // 始终显示标签
                             formatter: '{b}', // 显示 data.name
                             position: 'right', 
-                            color: 'white', // 标签颜色设为白色 (已满足)
+                            color: 'white', // 标签颜色设为白色
                             fontSize: 16,
                             fontWeight: 'bold',
                             textBorderColor: '#0b1120', 
@@ -404,11 +403,11 @@
                         },
                         
                         itemStyle: { 
-                            color: 'white', // 点的颜色设为白色 (已满足)
+                            color: 'white', // 点的颜色设为白色
                             shadowBlur: 15, // 更明显的阴影
                             shadowColor: 'white' 
                         },
-                        data: startPointData // 静态数据
+                        data: destinationPointData // 静态数据
                     }
                 ]
             };
@@ -444,7 +443,7 @@
                 const data = snapshot.val();
                 
                 // 简单判断是否已经存在，避免重复绘制
-                const isDuplicated = lineData.some(item => item.toName === data.city);
+                const isDuplicated = lineData.some(item => item.fromName === data.city);
                 if (!isDuplicated) {
                     drawOneLine(data.city);
                 }
@@ -454,25 +453,26 @@
         // B. 绘制一条线的通用逻辑
         function drawOneLine(cityName) {
             const targetCoords = cityCoords[cityName];
-            if (!targetCoords) return;
+            if (!targetCoords || cityName === DESTINATION_NAME) return; // 避免南岸区连接自己
 
             // **重要: 检查是否已存在该连线**
-            const isExist = lineData.some(item => item.toName === cityName);
+            const isExist = lineData.some(item => item.fromName === cityName);
             if (isExist) return;
 
+            // ***** 修改点: 连线方向反转 *****
             const newLine = {
-                fromName: START_NAME,
-                toName: cityName,
-                coords: [START_POINT, targetCoords]
+                fromName: cityName, // 提交的城市是起点
+                toName: DESTINATION_NAME, // 南岸区是终点
+                coords: [targetCoords, DESTINATION_POINT] // [起点坐标, 终点坐标]
             };
 
             lineData.push(newLine);
 
-            // 提取所有目标点用于涟漪效果 (现在也负责显示标签)
+            // 提取所有目标点用于涟漪效果 (现在是起始点)
             const activePoints = lineData.map(item => ({
-                name: item.toName,
+                name: item.fromName,
                 // ECharts effectScatter 数据格式 value: [longitude, latitude, value]
-                value: [...item.coords[1], 1] 
+                value: [...item.coords[0], 1] // 取第一个坐标 (起点)
             }));
 
             // 增量更新图表 (更新 series 2, 3, 4)
@@ -480,10 +480,10 @@
                 series: [
                     {}, // 0: map ignored
                     {}, // 1: scatter ignored
-                    { data: lineData }, // 2: blue lines
-                    { data: lineData }, // 3: gold particles
-                    { data: activePoints } // 4: ripple points (now with labels)
-                    // 5: start point ignored as it is static data
+                    { data: lineData }, // 2: blue lines (箭头从起点指向终点)
+                    { data: lineData }, // 3: gold particles (粒子从起点流向终点)
+                    { data: activePoints } // 4: ripple points (现在是起始点高亮)
+                    // 5: destination point ignored as it is static data
                 ]
             });
         }
@@ -491,8 +491,8 @@
         // C. [电脑端功能] 手动添加连线
         function manualAddLine() {
             const city = document.getElementById("pcCitySelect").value;
-            if (!city) {
-                alert("请先选择一个城市或区县！");
+            if (!city || city === DESTINATION_NAME) { // 避免连接自己
+                alert("请选择一个城市或区县！");
                 return;
             }
 
@@ -534,7 +534,7 @@
         }
 
         // ---------------------- 5. 其他 ----------------------
-        // 替换成你的手机端URL
+        // ***** 保持您修改后的永久地址 *****
         const phonePageUrl = "https://liqing010718-star.github.io/ChuanyuMap/phone.html";
         new QRCode(document.getElementById("qrcode"), {
             text: phonePageUrl,
@@ -547,6 +547,4 @@
         window.addEventListener('resize', () => chart.resize());
     </script>
 </body>
-
 </html>
-
