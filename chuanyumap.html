@@ -256,8 +256,8 @@
 
         // 加载并合并地图
         Promise.all([
-            fetch('https://geo.datav.aliyun.com/areas_v3/bound/510000_full.json').then(r => r.json()), // 四川
-            fetch('https://geo.datav.aliyun.com/areas_v3/bound/500000_full.json').then(r => r.json())  // 重庆
+            fetch('./sichuan.json').then(r => r.json()), // 四川
+            fetch('./chongqing.json').then(r => r.json())  // 重庆
         ]).then(([sichuanJson, chongqingJson]) => {
 
             // 合并 GeoJSON features
@@ -547,4 +547,5 @@
         window.addEventListener('resize', () => chart.resize());
     </script>
 </body>
+
 </html>
