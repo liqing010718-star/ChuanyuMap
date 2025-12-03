@@ -87,15 +87,25 @@
     const db = firebase.database();
 
     // -------------------------- 2. 动态生成城市下拉选项（与电脑端一致） --------------------------
+// 手机端 - 将 chuanYuCities 替换为更完整的列表
     const chuanYuCities = [
-      { name: "重庆市" }, { name: "万州区" }, { name: "黔江区" }, { name: "涪陵区" }, { name: "渝中区" },
-      { name: "大渡口区" }, { name: "江北区" }, { name: "沙坪坝区" }, { name: "九龙坡区" }, { name: "南岸区" },
-      { name: "北碚区" }, { name: "渝北区" }, { name: "巴南区" }, { name: "长寿区" }, { name: "成都市" },
-      { name: "绵阳市" }, { name: "德阳市" }, { name: "宜宾市" }, { name: "泸州市" }, { name: "乐山市" },
-      { name: "南充市" }, { name: "达州市" }, { name: "自贡市" }, { name: "攀枝花市" }, { name: "广元市" },
-      { name: "遂宁市" }, { name: "内江市" }, { name: "眉山市" }, { name: "广安市" }, { name: "雅安市" },
-      { name: "资阳市" }, { name: "巴中市" }, { name: "凉山彝族自治州" }
-    ];
+      { name: "重庆市" }, { name: "渝中区" }, { name: "大渡口区" }, { name: "江北区" },
+      { name: "沙坪坝区" }, { name: "九龙坡区" }, { name: "南岸区" }, { name: "北碚区" },
+      { name: "渝北区" }, { name: "巴南区" }, { name: "万州区" }, { name: "涪陵区" },
+      { name: "黔江区" }, { name: "长寿区" }, { name: "江津区" }, { name: "合川区" },
+      { name: "永川区" }, { name: "南川区" }, { name: "綦江区" }, { name: "大足区" },
+      { name: "璧山区" }, { name: "铜梁区" }, { name: "潼南区" }, { name: "荣昌区" },
+      { name: "开州区" }, { name: "梁平区" }, { name: "武隆区" }, { name: "城口县" },
+      { name: "丰都县" }, { name: "垫江县" }, { name: "忠县" }, { name: "云阳县" },
+      { name: "奉节县" }, { name: "巫山县" }, { name: "巫溪县" }, { name: "石柱土家族自治县" },
+      { name: "秀山土家族苗族自治县" }, { name: "酉阳土家族苗族自治县" }, { name: "彭水苗族土家族自治县" },
+      { name: "成都市" }, { name: "绵阳市" }, { name: "德阳市" }, { name: "宜宾市" },
+      { name: "泸州市" }, { name: "乐山市" }, { name: "南充市" }, { name: "达州市" },
+      { name: "自贡市" }, { name: "攀枝花市" }, { name: "广元市" }, { name: "遂宁市" },
+      { name: "内江市" }, { name: "眉山市" }, { name: "广安市" }, { name: "雅安市" },
+      { name: "资阳市" }, { name: "巴中市" }, { name: "凉山彝族自治州" },
+      { name: "阿坝藏族羌族自治州" }, { name: "甘孜藏族自治州" }
+    ].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN')); // 增加排序
 
     const citySelect = document.getElementById("citySelect");
     chuanYuCities.forEach(city => {
