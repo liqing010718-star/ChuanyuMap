@@ -1,150 +1,236 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>选择你的家乡</title>
-  <style>
-    body { 
-      font-family: "微软雅黑", sans-serif; 
-      padding: 20px; 
-      max-width: 400px; 
-      margin: 0 auto; 
-      background-color: #f5f5f5;
-    }
-    .container {
-      background: white;
-      padding: 30px;
-      border-radius: 12px;
-      box-shadow: 0 2px 15px rgba(0,0,0,0.05);
-    }
-    h1 { 
-      text-align: center; 
-      color: #333; 
-      font-size: 24px; 
-      margin: 0 0 30px 0;
-    }
-    .form-group { margin-bottom: 25px; }
-    select { 
-      width: 100%; 
-      padding: 14px; 
-      border: 1px solid #ddd; 
-      border-radius: 8px; 
-      font-size: 16px; 
-      background-color: white;
-      appearance: none;
-      background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 14px center;
-      background-size: 16px;
-    }
-    button { 
-      width: 100%; 
-      padding: 14px; 
-      background-color: #1890ff; 
-      color: white; 
-      border: none; 
-      border-radius: 8px; 
-      font-size: 16px; 
-      cursor: pointer; 
-      transition: background-color 0.3s;
-    }
-    button:hover { background-color: #096dd9; }
-    button:disabled {
-      background-color: #87ceeb;
-      cursor: not-allowed;
-    }
-  </style>
-  <!-- 关键修复：手机端也用 Firebase 兼容版，和电脑端一致 -->
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>点亮川渝 - 互动控制器</title>
+    <style>
+        /* 1. 基础重置与布局 */
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            padding: 20px; 
+            margin: 0; 
+            background: linear-gradient(135deg, #0b1120 0%, #1785BF 100%); /* 与大屏风格统一的深色背景 */
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+
+        /* 2. 卡片容器 */
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px 25px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        /* 3. 标题与装饰 */
+        h1 { 
+            color: #101B3B; 
+            font-size: 24px; 
+            margin: 0 0 25px 0; 
+            font-weight: 800;
+            letter-spacing: 1px;
+        }
+        .subtitle {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+
+        /* 4. 表单元素 */
+        .form-group { margin-bottom: 20px; text-align: left; }
+        .form-group label { 
+            display: block; 
+            margin-bottom: 8px; 
+            font-size: 14px; 
+            color: #1785BF; 
+            font-weight: 700; 
+        }
+        
+        select { 
+            width: 100%; 
+            padding: 14px; 
+            border: 2px solid #e0e0e0; 
+            border-radius: 12px; 
+            font-size: 16px; 
+            outline: none;
+            background-color: #f9f9f9;
+            box-sizing: border-box; 
+            appearance: none; /* 移除原生样式 */
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+            background-size: 1em;
+        }
+        select:focus { 
+            border-color: #1785BF; 
+            background-color: #fff;
+            box-shadow: 0 0 0 4px rgba(23, 133, 191, 0.1);
+        }
+        
+        /* 5. 按钮样式 */
+        button { 
+            width: 100%; 
+            padding: 16px; 
+            background: linear-gradient(90deg, #1785BF, #096dd9); 
+            color: white; 
+            border: none; 
+            border-radius: 12px; 
+            font-size: 18px; 
+            font-weight: 600;
+            cursor: pointer; 
+            box-shadow: 0 4px 15px rgba(23, 133, 191, 0.4);
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+        button:active { transform: scale(0.96); }
+        button:disabled { 
+            background: #ccc; 
+            box-shadow: none; 
+            cursor: not-allowed; 
+        }
+
+        .footer { margin-top: 25px; font-size: 12px; color: #aaa; }
+    </style>
+    
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 </head>
 <body>
-  <div class="container">
-    <h1>你的家乡是哪里？</h1>
-    <div class="form-group">
-      <select id="citySelect" required>
-        <option value="">请选择你的家乡城市</option>
-        <!-- 城市选项将通过JS动态生成 -->
-      </select>
-    </div>
-    <button onclick="submitHometown()">提交</button>
-  </div>
-
-  <script>
-    // -------------------------- 1. 初始化 Firebase（兼容版，与电脑端完全一致） --------------------------
-    const firebaseConfig = {
-      apiKey: "AIzaSyC8ShQbPovscKxEH-uN7HkCBbKAN514u5Q",
-      authDomain: "maptest-7cc7d.firebaseapp.com",
-      databaseURL: "https://maptest-7cc7d-default-rtdb.firebaseio.com",
-      projectId: "maptest-7cc7d",
-      storageBucket: "maptest-7cc7d.firebasestorage.app",
-      messagingSenderId: "420772513972",
-      appId: "1:420772513972:web:76fb5ce8e19b82be66afe1"
-    };
-    // 兼容版初始化方式
-    const app = firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-
-    // -------------------------- 2. 动态生成城市下拉选项（与电脑端一致） --------------------------
-// 手机端 - 将 chuanYuCities 替换为更完整的列表
-    const chuanYuCities = [
-      { name: "重庆市" }, { name: "渝中区" }, { name: "大渡口区" }, { name: "江北区" },
-      { name: "沙坪坝区" }, { name: "九龙坡区" }, { name: "南岸区" }, { name: "北碚区" },
-      { name: "渝北区" }, { name: "巴南区" }, { name: "万州区" }, { name: "涪陵区" },
-      { name: "黔江区" }, { name: "长寿区" }, { name: "江津区" }, { name: "合川区" },
-      { name: "永川区" }, { name: "南川区" }, { name: "綦江区" }, { name: "大足区" },
-      { name: "璧山区" }, { name: "铜梁区" }, { name: "潼南区" }, { name: "荣昌区" },
-      { name: "开州区" }, { name: "梁平区" }, { name: "武隆区" }, { name: "城口县" },
-      { name: "丰都县" }, { name: "垫江县" }, { name: "忠县" }, { name: "云阳县" },
-      { name: "奉节县" }, { name: "巫山县" }, { name: "巫溪县" }, { name: "石柱土家族自治县" },
-      { name: "秀山土家族苗族自治县" }, { name: "酉阳土家族苗族自治县" }, { name: "彭水苗族土家族自治县" },
-      { name: "成都市" }, { name: "绵阳市" }, { name: "德阳市" }, { name: "宜宾市" },
-      { name: "泸州市" }, { name: "乐山市" }, { name: "南充市" }, { name: "达州市" },
-      { name: "自贡市" }, { name: "攀枝花市" }, { name: "广元市" }, { name: "遂宁市" },
-      { name: "内江市" }, { name: "眉山市" }, { name: "广安市" }, { name: "雅安市" },
-      { name: "资阳市" }, { name: "巴中市" }, { name: "凉山彝族自治州" },
-      { name: "阿坝藏族羌族自治州" }, { name: "甘孜藏族自治州" }
-    ].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN')); // 增加排序
-
-    const citySelect = document.getElementById("citySelect");
-    chuanYuCities.forEach(city => {
-      const option = document.createElement("option");
-      option.value = city.name;
-      option.textContent = city.name;
-      citySelect.appendChild(option);
-    });
-
-    // -------------------------- 3. 提交家乡信息到Firebase --------------------------
-    function submitHometown() {
-      const selectedCity = citySelect.value.trim();
-      if (!selectedCity) {
-        alert("请选择你的家乡城市！");
-        return;
-      }
-
-      // 禁用按钮防止重复提交
-      const submitBtn = document.querySelector("button");
-      submitBtn.disabled = true;
-      submitBtn.textContent = "提交中...";
-
-      // 向Firebase数据库添加提交记录
-      db.ref("hometownSubmissions").push({
-        city: selectedCity,
-        submitTime: new Date().toLocaleString()
-      }, function(error) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = "提交";
+    <div class="container">
+        <h1>🚀 点亮川渝连线</h1>
+        <p class="subtitle">在下方选择您的家乡与目的地<br>大屏幕将实时展示您的轨迹</p>
         
-        if (error) {
-          alert("提交失败，请检查网络后重试！");
-          console.error("提交失败：", error);
-        } else {
-          alert("提交成功！电脑端地图已更新连线～");
-          citySelect.value = "";
+        <div class="form-group">
+            <label for="originSelect">🚩 起点城市</label>
+            <select id="originSelect" required>
+                <option value="">点击选择起点...</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="destinationSelect">🏁 终点城市</label>
+            <select id="destinationSelect" required>
+                <option value="">点击选择终点...</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="weightSelect">✨ 情感权重 (线条粗细)</label>
+            <select id="weightSelect" required>
+                <option value="1">1 (涓涓细流)</option>
+                <option value="3">3</option>
+                <option value="5" selected>5 (默认)</option>
+                <option value="7">7</option>
+                <option value="10">10 (宽阔大道)</option>
+            </select>
+        </div>
+
+        <button onclick="submitHometown()" id="submitBtn">发射信号</button>
+        <div class="footer">数据实时同步至大屏 · Power by ECharts</div>
+    </div>
+
+    <script>
+        // -------------------------- 1. 初始化 Firebase --------------------------
+        // 配置必须与电脑端完全一致
+        const firebaseConfig = {
+            apiKey: "AIzaSyC8ShQbPovscKxEH-uN7HkCBbKAN514u5Q",
+            authDomain: "maptest-7cc7d.firebaseapp.com",
+            databaseURL: "https://maptest-7cc7d-default-rtdb.firebaseio.com",
+            projectId: "maptest-7cc7d",
+            storageBucket: "maptest-7cc7d.firebasestorage.app",
+            messagingSenderId: "420772513972",
+            appId: "1:420772513972:web:76fb5ce8e19b82be66afe1"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // -------------------------- 2. 动态生成城市下拉选项 --------------------------
+        // 该列表已更新，与电脑端 cityCoords 的键值严格对应
+        const cities = [
+            // --- 重庆市 ---
+            "重庆市", "渝中区", "大渡口区", "江北区", "沙坪坝区", "九龙坡区", "南岸区", "北碚区", "渝北区", "巴南区", 
+            "万州区", "涪陵区", "黔江区", "长寿区", "江津区", "合川区", "永川区", "南川区", "綦江区", "大足区", 
+            "璧山区", "铜梁区", "潼南区", "荣昌区", "开州区", "梁平区", "武隆区", "城口县", "丰都县", "垫江县", 
+            "忠县", "云阳县", "奉节县", "巫山县", "巫溪县", "石柱土家族自治县", "秀山土家族苗族自治县", "酉阳土家族苗族自治县", "彭水苗族土家族自治县",
+            // --- 四川省 ---
+            "成都市", "绵阳市", "德阳市", "宜宾市", "泸州市", "乐山市", "南充市", "达州市", "自贡市", "攀枝花市", 
+            "广元市", "遂宁市", "内江市", "眉山市", "广安市", "雅安市", "资阳市", "巴中市", "凉山彝族自治州", 
+            "阿坝藏族羌族自治州", "甘孜藏族自治州"
+        ];
+
+        // 核心：使用中文拼音排序，保证和电脑端顺序一致，方便寻找
+        cities.sort((a, b) => a.localeCompare(b, 'zh-CN'));
+
+        const originSelect = document.getElementById("originSelect");
+        const destinationSelect = document.getElementById("destinationSelect");
+        
+        // 填充下拉框
+        cities.forEach(name => {
+            const opt1 = document.createElement("option"); opt1.value = name; opt1.text = name;
+            originSelect.add(opt1);
+            
+            const opt2 = document.createElement("option"); opt2.value = name; opt2.text = name;
+            destinationSelect.add(opt2);
+        });
+        
+        // -------------------------- 3. 提交逻辑 --------------------------
+        function submitHometown() {
+            const origin = originSelect.value.trim();
+            const destination = destinationSelect.value.trim();
+            const weight = document.getElementById("weightSelect").value;
+            
+            // 校验
+            if (!origin || !destination) {
+                return alert("请确保【起点】和【终点】都已选择！");
+            }
+            if (origin === destination) {
+                return alert("起点和终点不能是同一个城市哦~");
+            }
+
+            const btn = document.getElementById("submitBtn");
+            const originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = "🚀 信号传输中...";
+
+            // 提交数据
+            // 注意：手机端只负责“提交意图”，实线还是虚线的渲染逻辑由电脑端统一判断
+            db.ref("hometownSubmissions").push({
+                origin: origin,
+                destination: destination,
+                weight: parseInt(weight),
+                source: "Mobile_User", // 标记来源
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            }).then(() => {
+                // 成功反馈
+                btn.style.background = "linear-gradient(90deg, #52c41a, #389e0d)"; // 变绿
+                btn.innerText = "✅ 发射成功！请看大屏";
+                
+                // 2秒后重置按钮，方便下一次提交
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                    btn.style.background = ""; // 恢复原色
+                    // 可选：重置表单
+                    // originSelect.value = "";
+                    // destinationSelect.value = "";
+                }, 2000);
+                
+            }).catch(err => {
+                alert("提交失败，请检查网络连接");
+                console.error(err);
+                btn.disabled = false;
+                btn.innerText = originalText;
+            });
         }
-      });
-    }
-  </script>
+    </script>
 </body>
 </html>
