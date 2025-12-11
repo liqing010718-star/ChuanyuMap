@@ -238,8 +238,8 @@
         const getTextureImage = () => { const img = new Image(); img.src = textureImg; return img; };
 
         Promise.all([
-            fetch('./data/sichuan.json').then(r => r.json()),
-            fetch('./data/chongqing.json').then(r => r.json())
+            fetch('./sichuan.json').then(r => r.json()),
+            fetch('./chongqing.json').then(r => r.json())
         ]).then(([sichuanJson, chongqingJson]) => {
             const combinedFeatures = [...sichuanJson.features, ...chongqingJson.features];
             const combinedJson = { type: "FeatureCollection", features: combinedFeatures };
@@ -526,3 +526,4 @@
     </script>
 </body>
 </html>
+
