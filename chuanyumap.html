@@ -4,11 +4,9 @@
     <meta charset="UTF-8">
     <title>川渝城市群家乡连线地图</title>
     <style>
-        /* ------------------ 样式部分 (保持原版深色风格) ------------------ */
         body { margin: 0; padding: 0; overflow: hidden; background: #0b1120; }
         #chart-container { width: 100vw; height: 100vh; }
 
-        /* 右上角二维码悬浮窗 */
         #qrcode-container {
             position: fixed;
             top: 20px;
@@ -33,7 +31,6 @@
             border-radius: 4px;
         }
 
-        /* 左上角操作控制面板 */
         #controls-container {
             position: fixed;
             top: 20px;
@@ -44,7 +41,7 @@
             border-radius: 10px;
             box-shadow: 0 0 20px rgba(23, 133, 191, 0.4);
             z-index: 999;
-            width: 260px;
+            width: 280px;
         }
         #controls-container h3 {
             color: #fff;
@@ -82,10 +79,9 @@
         }
         .btn-clear {
             background: linear-gradient(90deg, #ff4d4f, #cf1322);
-            box-shadow: 0 2px 10px hwb(359 22% 56% / 0.3);
+            box-shadow: 0 2px 10px rgba(255, 77, 79, 0.3);
         }
 
-        /* 加载提示 */
         #loading {
             position: fixed;
             top: 50%; left: 50%;
@@ -94,6 +90,28 @@
             font-size: 20px;
             font-family: sans-serif;
             z-index: 1000;
+        }
+
+        #status-box {
+            margin-top: 12px;
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #d9f7ff;
+            background: rgba(24, 144, 255, 0.12);
+            border: 1px solid rgba(24, 144, 255, 0.35);
+            word-break: break-all;
+        }
+        #status-box.error {
+            color: #fff1f0;
+            background: rgba(255, 77, 79, 0.12);
+            border-color: rgba(255, 77, 79, 0.35);
+        }
+        #status-box.success {
+            color: #f6ffed;
+            background: rgba(82, 196, 26, 0.12);
+            border-color: rgba(82, 196, 26, 0.35);
         }
     </style>
 
@@ -110,17 +128,20 @@
 
     <div id="controls-container">
         <h3>控制台</h3>
+
         <div class="control-group">
             <select id="pcCitySelect">
                 <option value="">-- 选择起点城市 --</option>
             </select>
         </div>
+
         <div class="control-group">
             <select id="pcDestinationSelect">
                 <option value="">-- 选择终点城市 --</option>
             </select>
         </div>
-<div class="control-group">
+
+        <div class="control-group">
             <select id="pcWeightSelect">
                 <option value="1">-- 选择通行次数 (默认为1) --</option>
                 <option value="1">1</option>
@@ -135,10 +156,13 @@
                 <option value="10">10</option>
             </select>
         </div>
+
         <div class="btn-row">
             <button class="btn-add" onclick="manualAddLine()">生成连线</button>
             <button class="btn-clear" onclick="clearAllLines()">清除连线</button>
         </div>
+
+        <div id="status-box">状态：等待初始化...</div>
     </div>
 
     <div id="qrcode-container">
@@ -147,9 +171,7 @@
     </div>
 
     <script>
-        // ---------------------- 1. 基础配置 (城市列表) ----------------------
         const cityCoords = {
-            // -------------------- 重庆市 (38个区县) --------------------
             "重庆市": [106.550464, 29.563009], "渝中区": [106.587254, 29.554681], "大渡口区": [106.498954, 29.532517],
             "江北区": [106.568652, 29.582741], "沙坪坝区": [106.442734, 29.579036], "九龙坡区": [106.468845, 29.513925],
             "南岸区": [106.597446, 29.504003], "北碚区": [106.334113, 29.813385], "渝北区": [106.648904, 29.626314],
@@ -162,7 +184,7 @@
             "云阳县": [108.70, 30.91], "奉节县": [109.47, 31.02], "巫山县": [109.87, 31.07], "巫溪县": [109.64, 31.43],
             "石柱土家族自治县": [108.06, 30.04], "秀山土家族苗族自治县": [108.99, 28.47], "酉阳土家族苗族自治县": [108.76, 28.84],
             "彭水苗族土家族自治县": [108.16, 29.28],
-            // -------------------- 四川省 (21个市州) --------------------
+
             "成都市": [104.065735, 30.659462], "绵阳市": [104.755164, 31.474372], "德阳市": [104.386120, 31.131889],
             "宜宾市": [104.635578, 28.760958], "泸州市": [105.386194, 28.881175], "乐山市": [103.760285, 29.594672],
             "南充市": [106.082530, 30.836056], "达州市": [107.501748, 31.202922], "自贡市": [104.773416, 29.344625],
@@ -172,26 +194,39 @@
             "凉山彝族自治州": [102.269390, 27.921766], "阿坝藏族羌族自治州": [103.0905, 31.9009], "甘孜藏族自治州": [101.9566, 30.0410]
         };
 
-        // 连线数据缓存
         let lineData = [];
+        let chart = null;
+        let db = null;
 
-        // 静态点位
+        const statusBox = document.getElementById("status-box");
+
+        function setStatus(message, type = "") {
+            statusBox.className = "";
+            if (type) {
+                statusBox.classList.add(type);
+            }
+            statusBox.textContent = "状态：" + message;
+        }
+
         const allCityPoints = Object.keys(cityCoords).map(name => ({
             name: name,
             value: [...cityCoords[name]]
         }));
 
-        // 填充下拉框
         const cityNames = Object.keys(cityCoords);
         cityNames.sort((a, b) => a.localeCompare(b, 'zh-CN'));
         cityNames.forEach(city => {
-            const opt1 = document.createElement("option"); opt1.value = city; opt1.text = city;
+            const opt1 = document.createElement("option");
+            opt1.value = city;
+            opt1.text = city;
             document.getElementById("pcCitySelect").appendChild(opt1);
-            const opt2 = document.createElement("option"); opt2.value = city; opt2.text = city;
+
+            const opt2 = document.createElement("option");
+            opt2.value = city;
+            opt2.text = city;
             document.getElementById("pcDestinationSelect").appendChild(opt2);
         });
 
-        // ---------------------- 2. Firebase 初始化 ----------------------
         const firebaseConfig = {
             apiKey: "AIzaSyC8ShQbPovscKxEH-uN7HkCBbKAN514u5Q",
             authDomain: "maptest-7cc7d.firebaseapp.com",
@@ -201,35 +236,48 @@
             messagingSenderId: "420772513972",
             appId: "1:420772513972:web:76fb5ce8e19b82be66afe1"
         };
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
 
-        // ---------------------- 3. 颜色和样式工具函数 (恢复唯一哈希色) ----------------------
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.database();
+            setStatus("Firebase 初始化成功，正在检测数据库连接...");
+        } catch (e) {
+            console.error("Firebase 初始化失败：", e);
+            setStatus("Firebase 初始化失败：" + e.message, "error");
+        }
 
-        /**
-         * 生成唯一的颜色：
-         * 关键点：将两个城市名排序后再生成Hash，确保 A->B 和 B->A 的颜色值完全一致
-         */
+        function testFirebaseConnection() {
+            if (!db) return;
+
+            db.ref(".info/connected").on("value", function(snapshot) {
+                const connected = snapshot.val();
+                if (connected === true) {
+                    setStatus("已连接 Firebase，等待数据同步...", "success");
+                } else {
+                    setStatus("未连接到 Firebase，请检查数据库配置或网络。", "error");
+                }
+            });
+        }
+
         function getLineColorHash(cityA, cityB) {
             const key = cityA < cityB ? `${cityA}-${cityB}` : `${cityB}-${cityA}`;
             let hash = 0;
             for (let i = 0; i < key.length; i++) {
                 hash = key.charCodeAt(i) + ((hash << 5) - hash);
             }
-            // 调整 RGB 范围，确保颜色在深色地图上鲜艳可见
             const maxColor = 220;
             const minColor = 80;
-            let r = Math.min(maxColor, Math.max(minColor, (hash >> 16) & 0xFF));
-            let g = Math.min(maxColor, Math.max(minColor, (hash >> 8) & 0xFF));
-            let b = Math.min(maxColor, Math.max(minColor, hash & 0xFF));
-            return '#' + r.toString(16).padStart(2, '0') + g.toString(16).padStart(2, '0') + b.toString(16).padStart(2, '0');
+            const r = Math.min(maxColor, Math.max(minColor, (hash >> 16) & 0xFF));
+            const g = Math.min(maxColor, Math.max(minColor, (hash >> 8) & 0xFF));
+            const b = Math.min(maxColor, Math.max(minColor, hash & 0xFF));
+            return '#' + r.toString(16).padStart(2, '0') +
+                   g.toString(16).padStart(2, '0') +
+                   b.toString(16).padStart(2, '0');
         }
 
-        function getLineStyle(cityA, cityB, weight, isSolid) {
+        function getLineStyle(cityA, cityB, weight) {
             const baseColor = getLineColorHash(cityA, cityB);
             const maxShadow = 20;
-
-            // 权重影响粗细和光晕
             const lineWidth = 1.2 + (weight * 0.25);
             const shadowBlur = Math.min(maxShadow, weight * 1.8);
 
@@ -240,18 +288,29 @@
             };
         }
 
-        // ---------------------- 4. ECharts 初始化 ----------------------
-        const chart = echarts.init(document.getElementById('chart-container'));
+        chart = echarts.init(document.getElementById('chart-container'));
+
         const textureImg = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAL0lEQVQIW2NkQAJ/Gf5vBAmwMYAAmAATEBPG///+/zcD8xn+//8PUgRTAzYAzCwA+2sXc9/j52QAAAAASUVORK5CYII=';
-        const getTextureImage = () => { const img = new Image(); img.src = textureImg; return img; };
+        const getTextureImage = () => {
+            const img = new Image();
+            img.src = textureImg;
+            return img;
+        };
 
         Promise.all([
-            fetch('./sichuan.json').then(r => r.json()),
-            fetch('./chongqing.json').then(r => r.json())
+            fetch('./sichuan.json').then(r => {
+                if (!r.ok) throw new Error('sichuan.json 加载失败');
+                return r.json();
+            }),
+            fetch('./chongqing.json').then(r => {
+                if (!r.ok) throw new Error('chongqing.json 加载失败');
+                return r.json();
+            })
         ]).then(([sichuanJson, chongqingJson]) => {
             const combinedFeatures = [...sichuanJson.features, ...chongqingJson.features];
             const combinedJson = { type: "FeatureCollection", features: combinedFeatures };
             echarts.registerMap('chuanyu', combinedJson);
+
             document.getElementById('loading').style.display = 'none';
 
             const option = {
@@ -291,9 +350,7 @@
                 },
                 series: [
                     { type: 'map', map: 'chuanyu', geoIndex: 0, label: { show: false }, select: { disabled: true } },
-                    // 1. 静态背景点
                     { type: 'scatter', coordinateSystem: 'geo', zlevel: 5, data: allCityPoints, itemStyle: { color: 'rgba(255, 255, 255, 0.4)' } },
-                    // 2. 实线 (Priority)
                     {
                         type: 'lines',
                         zlevel: 3,
@@ -302,14 +359,13 @@
                             period: 4,
                             trailLength: 0.4,
                             symbol: 'arrow',
-                            symbolSize: 8, // 箭头调大，更明显
+                            symbolSize: 8
                         },
                         lineStyle: {
                             normal: { curveness: 0.2 }
                         },
                         data: []
                     },
-                    // 3. 虚线 (Conflict/Return)
                     {
                         type: 'lines',
                         zlevel: 3,
@@ -317,15 +373,14 @@
                             show: true,
                             period: 4,
                             trailLength: 0.4,
-                            symbol: 'circle', // 虚线用圆点
-                            symbolSize: 4,
+                            symbol: 'circle',
+                            symbolSize: 4
                         },
                         lineStyle: {
                             normal: { curveness: 0.2 }
                         },
                         data: []
                     },
-                    // 4. 粒子特效
                     {
                         type: 'lines',
                         zlevel: 4,
@@ -341,31 +396,42 @@
                         },
                         data: []
                     },
-                    // 5. 起终点高亮
                     {
                         type: 'effectScatter',
                         coordinateSystem: 'geo',
                         zlevel: 6,
                         rippleEffect: { brushType: 'stroke', scale: 3 },
-                        label: { show: true, formatter: '{b}', position: 'right', color: '#FFD700', fontSize: 14, fontWeight: 'bold', textBorderColor: '#0b1120', textBorderWidth: 4 },
-                        itemStyle: { color: '#4DEFFF', shadowBlur: 10, shadowColor: '#fff' },
+                        label: {
+                            show: true,
+                            formatter: '{b}',
+                            position: 'right',
+                            color: '#FFD700',
+                            fontSize: 14,
+                            fontWeight: 'bold',
+                            textBorderColor: '#0b1120',
+                            textBorderWidth: 4
+                        },
+                        itemStyle: {
+                            color: '#4DEFFF',
+                            shadowBlur: 10,
+                            shadowColor: '#fff'
+                        },
                         data: []
                     }
                 ]
             };
 
             chart.setOption(option);
-            startListening();
 
+            testFirebaseConnection();
+            startListening();
         }).catch(err => {
             console.error(err);
-            document.getElementById('loading').innerText = "地图加载失败，请检查 ./data/ 目录";
+            document.getElementById('loading').innerText = "地图加载失败，请检查 sichuan.json / chongqing.json 文件";
+            setStatus("地图资源加载失败：" + err.message, "error");
         });
 
-        // ---------------------- 5. 核心逻辑控制 (智能冲突检测 + 独立颜色) ----------------------
-
         function updateChart() {
-            // 1. 提取点
             const activePointsSet = new Set();
             lineData.forEach(item => {
                 activePointsSet.add(item.origin);
@@ -377,22 +443,20 @@
                 value: cityCoords[name] ? [...cityCoords[name], 1] : undefined
             })).filter(point => point.value);
 
-            // 2. 分类连线
             const solidLineData = [];
             const dashedLineData = [];
-            const allParticlesData = []; 
+            const allParticlesData = [];
 
             lineData.forEach(item => {
                 const isSolid = item.isSolid;
-                // 计算样式 (颜色基于城市对，不基于方向)
-                const style = getLineStyle(item.origin, item.destination, item.weight, isSolid); 
+                const style = getLineStyle(item.origin, item.destination, item.weight);
 
                 const lineObject = {
                     name: `${item.origin} → ${item.destination}`,
                     fromName: item.origin,
                     toName: item.destination,
                     weight: item.weight,
-                    isSolid: isSolid, 
+                    isSolid: isSolid,
                     coords: item.coords,
                     lineStyle: {
                         normal: {
@@ -400,46 +464,48 @@
                             width: style.lineWidth,
                             shadowBlur: style.shadowBlur,
                             shadowColor: style.color,
-                            opacity: isSolid ? 0.8 : 0.4, // 虚线淡一些
+                            opacity: isSolid ? 0.8 : 0.4,
                             curveness: 0.2,
-                            type: isSolid ? 'solid' : 'dashed' // 关键区分
+                            type: isSolid ? 'solid' : 'dashed'
                         }
                     },
-                    // 飞线特效颜色与线条颜色保持一致
                     effect: { color: style.color }
                 };
 
                 if (isSolid) {
                     solidLineData.push(lineObject);
-                    // 实线粒子
-                    allParticlesData.push({ coords: item.coords, effect: { color: style.color } });
+                    allParticlesData.push({
+                        coords: item.coords,
+                        effect: { color: style.color }
+                    });
                 } else {
                     dashedLineData.push(lineObject);
-                    // 虚线粒子
-                    allParticlesData.push({ coords: item.coords, effect: { color: style.color, symbol: 'circle', symbolSize: 3 } });
+                    allParticlesData.push({
+                        coords: item.coords,
+                        effect: { color: style.color, symbol: 'circle', symbolSize: 3 }
+                    });
                 }
             });
 
-            // 批量更新
             chart.setOption({
                 series: [
-                    {}, // 0: map
-                    {}, // 1: scatter
-                    { data: solidLineData },    // 2: lines (solid)
-                    { data: dashedLineData },   // 3: lines (dashed)
-                    { data: allParticlesData }, // 4: particles
-                    { data: activePoints }      // 5: effectScatter
+                    {},
+                    {},
+                    { data: solidLineData },
+                    { data: dashedLineData },
+                    { data: allParticlesData },
+                    { data: activePoints }
                 ]
             });
         }
 
-        // A. 监听数据 (冲突检测逻辑核心)
         function startListening() {
+            if (!db) return;
+
             db.ref("hometownSubmissions").on("value", function(snapshot) {
-                lineData = []; 
-                const rawSubmissions = {}; 
-                
-                // 第一步：聚合权重
+                lineData = [];
+                const rawSubmissions = {};
+
                 snapshot.forEach(childSnapshot => {
                     const data = childSnapshot.val();
                     const origin = data.origin;
@@ -449,80 +515,121 @@
                     if (cityCoords[origin] && cityCoords[dest] && origin !== dest) {
                         const key = `${origin}->${dest}`;
                         if (!rawSubmissions[key]) {
-                            rawSubmissions[key] = { origin: origin, destination: dest, weightSum: 0 };
+                            rawSubmissions[key] = {
+                                origin: origin,
+                                destination: dest,
+                                weightSum: 0
+                            };
                         }
                         rawSubmissions[key].weightSum += weight;
                     }
                 });
 
-                // 第二步：智能判定虚实 (Collision Detection)
                 for (const key in rawSubmissions) {
                     const item = rawSubmissions[key];
                     const origin = item.origin;
                     const dest = item.destination;
                     const reverseKey = `${dest}->${origin}`;
-                    
-                    let isSolid = true; // 默认为实线
 
-                    // 只有当反向连接 也存在 时，才进行PK
+                    let isSolid = true;
+
                     if (rawSubmissions[reverseKey]) {
-                        // 规则：字典序大的起点变成虚线 (保证 A->B 和 B->A 必有一实一虚)
                         if (origin.localeCompare(dest, 'zh-CN') > 0) {
-                            isSolid = false; 
+                            isSolid = false;
                         }
-                    } 
-                    // 如果没有反向连接，C->A 保持实线 (isSolid = true)
+                    }
 
                     lineData.push({
                         origin: origin,
                         destination: dest,
                         weight: item.weightSum,
                         coords: [cityCoords[origin], cityCoords[dest]],
-                        isSolid: isSolid 
+                        isSolid: isSolid
                     });
                 }
 
                 updateChart();
+                setStatus(`数据同步成功，当前共有 ${lineData.length} 条聚合连线。`, "success");
+            }, function(error) {
+                console.error("监听数据库失败：", error);
+                setStatus("监听数据库失败：" + error.message, "error");
             });
         }
 
-        // B. 手动添加
         function manualAddLine() {
+            if (!db) {
+                alert("Firebase 未初始化成功");
+                return;
+            }
+
             const origin = document.getElementById("pcCitySelect").value;
             const destination = document.getElementById("pcDestinationSelect").value;
             const weight = document.getElementById("pcWeightSelect").value;
 
-            if (!origin || !destination) { alert("请选择起点和终点！"); return; }
-            if (origin === destination) { alert("起点和终点不能相同！"); return; }
+            if (!origin || !destination) {
+                alert("请选择起点和终点！");
+                return;
+            }
+            if (origin === destination) {
+                alert("起点和终点不能相同！");
+                return;
+            }
+
+            setStatus("正在写入连线数据...", "");
 
             db.ref("hometownSubmissions").push({
                 origin: origin,
                 destination: destination,
-                weight: parseInt(weight),
+                weight: parseInt(weight, 10),
                 source: "PC_Manual",
                 timestamp: firebase.database.ServerValue.TIMESTAMP
+            }).then(() => {
+                console.log("PC 写入成功");
+                setStatus(`写入成功：${origin} → ${destination}`, "success");
+                alert("生成成功！");
+            }).catch(err => {
+                console.error("PC 写入失败：", err);
+                setStatus("写入失败：" + err.message, "error");
+                alert("生成失败：" + err.message);
             });
         }
 
-        // C. 清除
         function clearAllLines() {
+            if (!db) {
+                alert("Firebase 未初始化成功");
+                return;
+            }
+
             if (!confirm("确定要清除屏幕上所有连线吗？这将同时清空云端历史数据。")) return;
+
+            setStatus("正在清除云端数据...", "");
+
             db.ref("hometownSubmissions").remove().then(() => {
                 lineData = [];
-                chart.setOption({ series: [{}, {}, { data: [] }, { data: [] }, { data: [] }, { data: [] }] });
+                chart.setOption({
+                    series: [{}, {}, { data: [] }, { data: [] }, { data: [] }, { data: [] }]
+                });
+                setStatus("已清除所有连线数据。", "success");
+                alert("清除成功！");
+            }).catch(err => {
+                console.error("清除失败：", err);
+                setStatus("清除失败：" + err.message, "error");
+                alert("清除失败：" + err.message);
             });
         }
 
-        // D. 杂项
         const phonePageUrl = "https://liqing010718-star.github.io/ChuanyuMap/phone.html";
         new QRCode(document.getElementById("qrcode"), {
-            text: phonePageUrl, width: 120, height: 120,
-            colorDark : "#000000", colorLight : "#ffffff"
+            text: phonePageUrl,
+            width: 120,
+            height: 120,
+            colorDark: "#000000",
+            colorLight: "#ffffff"
         });
-        window.addEventListener('resize', () => chart.resize());
+
+        window.addEventListener('resize', () => {
+            if (chart) chart.resize();
+        });
     </script>
 </body>
 </html>
-
-
-
